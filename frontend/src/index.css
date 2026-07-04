@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-950 text-gray-100 font-sans antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-200/30;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-surface-800/50 backdrop-blur-xl border border-white/5 rounded-2xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:border-white/10 hover:bg-surface-800/70 hover:shadow-lg hover:-translate-y-0.5;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider;
+  }
+
+  .status-running {
+    @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20;
+  }
+
+  .status-warning {
+    @apply bg-amber-500/10 text-amber-400 border border-amber-500/20;
+  }
+
+  .status-critical {
+    @apply bg-red-500/10 text-red-400 border border-red-500/20;
+  }
+
+  .status-stopped {
+    @apply bg-gray-500/10 text-gray-400 border border-gray-500/20;
+  }
+
+  .metric-value {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .metric-label {
+    @apply text-xs text-gray-400 uppercase tracking-wider font-medium;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-white;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-gray-200;
+  }
+}

@@ -1,0 +1,57 @@
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: edgetwin
+      POSTGRES_USER: edgetwin
+      POSTGRES_PASSWORD: edgetwin_dev
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/src/main/resources/data.sql:/docker-entrypoint-initdb.d/02-data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edgetwin"]
+      interval: 5s
+      retries: 5
+
+  edge-ai:
+    build: ./edge-ai
+    ports:
+      - "8000:8000"
+    environment:
+      EDGEAI_MODEL_PATH: /app/model.pkl
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/edgetwin
+      SPRING_DATASOURCE_USERNAME: edgetwin
+      SPRING_DATASOURCE_PASSWORD: edgetwin_dev
+      EDGE_AI_ENABLED: "true"
+      EDGE_AI_BASE_URL: http://edge-ai:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      edge-ai:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+
