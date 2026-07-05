@@ -96,10 +96,10 @@ echo       Waiting 6s for Vite to compile...
 timeout /t 6 /nobreak > nul
 echo  [OK] React at http://localhost:5173
 
-:: ── 5. Sensor Simulator ────────────────────────────────────
-echo  [5/5] Starting Sensor Simulator...
-start "Simulator" cmd /k "title Simulator ^& cd /d %ROOT% && python simulator.py --machines 6 --interval 2.5"
-echo  [OK] Simulator running ^(6 machines^)
+:: ── 5. Sensor Simulator (optional — keeps seed health profiles stable) ──
+echo  [5/5] Sensor Simulator skipped by default
+echo       Run manually when you want live updates:
+echo       python simulator.py --machines 6 --interval 2.5
 
 echo.
 echo  ================================================

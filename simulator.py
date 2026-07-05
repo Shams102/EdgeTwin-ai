@@ -31,33 +31,78 @@ class MachineState:
     vibration: float       # mm/s
     pressure: float        # PSI
     rpm: float             # rotations per minute
+    profile: str = "healthy"
+    baseline_temp: float = 70.0
+    baseline_vib: float = 0.02
+    baseline_pressure: float = 30.0
+    baseline_rpm: float = 1500.0
     age: int = 0
-    degrading: bool = False
+    critical_cycles: int = 0
 
     def step(self):
-        """Advance simulation one timestep — gradually degrade sensor values."""
+        """Advance simulation one timestep using the machine's health profile."""
         self.age += 1
 
-        # Slow, realistic drift
-        self.temperature += random.uniform(0.0, 0.3)
-        self.vibration   += random.uniform(0.0, 0.0008)
-        self.pressure    += random.uniform(-0.1, 0.2)
-
-        # RPM wanders; more erratic at high vibration
-        if self.vibration > 0.05:
-            self.rpm += random.uniform(-80, 80)
+        # Check if we need to auto-reset due to simulated maintenance
+        if self.vibration > 0.065 or self.temperature > 95.0:
+            self.critical_cycles += 1
+            if self.critical_cycles > 12:  # ~30 seconds critical
+                self.reset_to_healthy()
+                return
         else:
-            self.rpm += random.uniform(-30, 30)
+            self.critical_cycles = 0
 
-        # Clamp to realistic ranges
+        # Randomly start degradation on stable/healthy machines to keep demo dynamic
+        if (self.profile == "stable" or self.profile == "healthy") and random.random() < 0.01:
+            self.profile = "degrading"
+
+        if self.profile == "degrading":
+            self._step_degrading()
+            # Transition to critical status if values exceed limit
+            if self.vibration > 0.055 or self.temperature > 92.0:
+                self.profile = "critical"
+        elif self.profile == "critical":
+            self._step_critical()
+        else:
+            self._step_stable()
+
+        self._clamp_values()
+
+    def reset_to_healthy(self):
+        print(f"  [MAINT] Maintenance performed on Machine {self.machine_id}. Resetting components to nominal.")
+        self.profile = "stable"
+        self.temperature = self.baseline_temp + random.uniform(-1, 1)
+        self.vibration = self.baseline_vib + random.uniform(-0.002, 0.002)
+        self.pressure = self.baseline_pressure + random.uniform(-0.5, 0.5)
+        self.rpm = self.baseline_rpm + random.uniform(-20, 20)
+        self.critical_cycles = 0
+
+    def _step_stable(self):
+        """Healthy/stable machines oscillate around their baseline."""
+        self.temperature += random.uniform(-0.4, 0.4) + (self.baseline_temp - self.temperature) * 0.08
+        self.vibration   += random.uniform(-0.0012, 0.0012) + (self.baseline_vib - self.vibration) * 0.08
+        self.pressure    += random.uniform(-0.2, 0.2) + (self.baseline_pressure - self.pressure) * 0.05
+        self.rpm         += random.uniform(-25, 25) + (self.baseline_rpm - self.rpm) * 0.05
+
+    def _step_degrading(self):
+        """Degrading machines slowly drift upward from their baseline."""
+        self.temperature += random.uniform(0.05, 0.25)
+        self.vibration   += random.uniform(0.0002, 0.0008)
+        self.pressure    += random.uniform(0.0, 0.15)
+        self.rpm         += random.uniform(-40, 20)
+
+    def _step_critical(self):
+        """Critical machines stay in a high-risk band with small variation."""
+        self.temperature += random.uniform(-0.6, 0.6) + (self.baseline_temp + 15.0 - self.temperature) * 0.04
+        self.vibration   += random.uniform(-0.002, 0.002) + (self.baseline_vib + 0.04 - self.vibration) * 0.04
+        self.pressure    += random.uniform(-0.3, 0.3) + (self.baseline_pressure + 8.0 - self.pressure) * 0.03
+        self.rpm         += random.uniform(-60, 60) + (self.baseline_rpm - 300 - self.rpm) * 0.03
+
+    def _clamp_values(self):
         self.temperature = max(55.0,  min(120.0, self.temperature))
         self.vibration   = max(0.005, min(0.09,  self.vibration))
         self.pressure    = max(18.0,  min(48.0,  self.pressure))
         self.rpm         = max(600.0, min(2200.0, self.rpm))
-
-        # Mark as degrading when vibration gets high
-        if self.vibration > 0.055:
-            self.degrading = True
 
     def to_payload(self):
         return {
@@ -71,23 +116,28 @@ class MachineState:
 def build_machines(count: int) -> List[MachineState]:
     """Create initial machine states matching the 6 seed machines."""
     profiles = [
-        # id, temp,  vib,   psi,   rpm
-        (1,   65.0,  0.018, 28.5,  1480),  # CNC Mill A3 - healthy
-        (2,   80.0,  0.038, 32.5,  1185),  # Hydraulic Press B1 - degrading
-        (3,   58.0,  0.012, 25.0,  905),   # Conveyor Belt C2 - stable
-        (4,   94.0,  0.068, 39.0,  1830),  # Robotic Arm D4 - critical
-        (5,   70.5,  0.022, 30.0,  1345),  # Compressor E1 - good
-        (6,   72.5,  0.025, 31.5,  1595),  # Turbine F2 - stable
+        # id, temp,  vib,   psi,   rpm,   profile
+        (1,   65.0,  0.018, 28.5,  1480,  "healthy"),
+        (2,   80.0,  0.038, 32.5,  1185,  "degrading"),
+        (3,   58.0,  0.012, 25.0,  905,   "stable"),
+        (4,   94.0,  0.068, 39.0,  1830,  "critical"),
+        (5,   70.5,  0.022, 30.0,  1345,  "healthy"),
+        (6,   72.5,  0.025, 31.5,  1595,  "stable"),
     ]
     machines = []
     for i in range(min(count, len(profiles))):
-        mid, temp, vib, psi, rpm = profiles[i]
+        mid, temp, vib, psi, rpm, profile = profiles[i]
         machines.append(MachineState(
             machine_id=mid,
             temperature=temp + random.uniform(-1, 1),
             vibration=vib + random.uniform(-0.002, 0.002),
             pressure=psi + random.uniform(-0.5, 0.5),
             rpm=rpm + random.uniform(-20, 20),
+            profile=profile,
+            baseline_temp=temp,
+            baseline_vib=vib,
+            baseline_pressure=psi,
+            baseline_rpm=rpm,
         ))
     # Extra machines beyond 6 get random profiles
     for i in range(len(profiles), count):
