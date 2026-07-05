@@ -1,6 +1,49 @@
 import { getHealthHex } from '../../utils/formatters';
 import { STATUS_COLORS } from '../../utils/constants';
 
+/**
+ * Derive component health status from the latest prediction sensor values.
+ * Returns 'HEALTHY' | 'WARNING' | 'CRITICAL' for each component.
+ */
+function deriveComponentHealth(prediction, machineStatus) {
+  const temp = prediction?.temperature ?? 70;
+  const vib = prediction?.vibration ?? 0.02;
+  const pressure = prediction?.pressure ?? 30;
+  const rpm = prediction?.rpm ?? 1400;
+  const failProb = prediction?.failureProbability ?? 0;
+
+  // Engine: overall failure probability
+  const engineStatus =
+    failProb >= 0.7 ? 'CRITICAL' : failProb >= 0.4 ? 'WARNING' : 'HEALTHY';
+
+  // Motor: based on RPM deviation from ideal ~1400
+  const rpmDev = Math.abs(rpm - 1400) / 600;
+  const motorStatus =
+    rpmDev >= 0.7 ? 'CRITICAL' : rpmDev >= 0.4 ? 'WARNING' : 'HEALTHY';
+
+  // Bearing: based on vibration
+  const bearingStatus =
+    vib >= 0.06 ? 'CRITICAL' : vib >= 0.035 ? 'WARNING' : 'HEALTHY';
+
+  // Cooling: based on temperature
+  const coolingStatus =
+    temp >= 95 ? 'CRITICAL' : temp >= 80 ? 'WARNING' : 'HEALTHY';
+
+  return { engineStatus, motorStatus, bearingStatus, coolingStatus };
+}
+
+const STATUS_ICON = {
+  HEALTHY: '🟢',
+  WARNING: '🟡',
+  CRITICAL: '🔴',
+};
+
+const STATUS_TEXT_COLOR = {
+  HEALTHY: 'text-emerald-400',
+  WARNING: 'text-amber-400',
+  CRITICAL: 'text-red-400',
+};
+
 export default function DigitalTwinViewer({ machine, prediction }) {
   const status = machine?.status || 'STOPPED';
   const colors = STATUS_COLORS[status] || STATUS_COLORS.STOPPED;
@@ -8,6 +51,16 @@ export default function DigitalTwinViewer({ machine, prediction }) {
 
   const isRunning = status === 'RUNNING' || status === 'WARNING' || status === 'CRITICAL';
   const isCritical = status === 'CRITICAL';
+
+  const { engineStatus, motorStatus, bearingStatus, coolingStatus } =
+    deriveComponentHealth(prediction, status);
+
+  const components = [
+    { label: 'Engine', status: engineStatus, icon: '⚙️' },
+    { label: 'Motor', status: motorStatus, icon: '🔧' },
+    { label: 'Bearing', status: bearingStatus, icon: '🔩' },
+    { label: 'Cooling', status: coolingStatus, icon: '❄️' },
+  ];
 
   return (
     <div className="glass-card p-6 rounded-2xl animate-fade-in">
@@ -24,7 +77,6 @@ export default function DigitalTwinViewer({ machine, prediction }) {
 
         {/* Machine visualization */}
         <div className="relative flex flex-col items-center">
-          {/* Machine body */}
           <svg viewBox="0 0 200 160" className="w-full max-w-[280px]" xmlns="http://www.w3.org/2000/svg">
             {/* Base */}
             <rect x="30" y="120" width="140" height="20" rx="4" fill="#1e293b" stroke="#334155" strokeWidth="1" />
@@ -39,7 +91,7 @@ export default function DigitalTwinViewer({ machine, prediction }) {
               {prediction?.healthScore != null ? `${Math.round(prediction.healthScore)}%` : '--'}
             </text>
 
-            {/* Status indicator light */}
+            {/* Status indicator lights */}
             <circle cx="80" cy="100" r="4" fill={isRunning ? healthHex : '#475569'}>
               {isRunning && (
                 <animate attributeName="opacity" values="1;0.3;1" dur={isCritical ? '0.5s' : '2s'} repeatCount="indefinite" />
@@ -52,7 +104,7 @@ export default function DigitalTwinViewer({ machine, prediction }) {
             </circle>
             <circle cx="120" cy="100" r="4" fill={status === 'RUNNING' ? '#10b981' : '#475569'} />
 
-            {/* Rotating gear (when running) */}
+            {/* Rotating gear */}
             <g transform="translate(155, 70)">
               <circle r="12" fill="none" stroke="#334155" strokeWidth="1" />
               {isRunning && (
@@ -80,7 +132,7 @@ export default function DigitalTwinViewer({ machine, prediction }) {
             <line x1="150" y1="75" x2="170" y2="75" stroke="#334155" strokeWidth="3" strokeLinecap="round" />
           </svg>
 
-          {/* Status text */}
+          {/* Status badge */}
           <div className="mt-4 text-center">
             <span className={`status-badge ${colors.class}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${colors.dot} ${isRunning ? 'animate-pulse' : ''}`} />
@@ -89,7 +141,7 @@ export default function DigitalTwinViewer({ machine, prediction }) {
           </div>
         </div>
 
-        {/* Sensor values overlay */}
+        {/* Sensor values */}
         {prediction && (
           <div className="grid grid-cols-2 gap-2 mt-4">
             {[
@@ -107,6 +159,34 @@ export default function DigitalTwinViewer({ machine, prediction }) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Component-level health grid */}
+      <div className="mt-4">
+        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Component Status</p>
+        <div className="grid grid-cols-2 gap-2">
+          {components.map(({ label, status: cStatus, icon }) => (
+            <div
+              key={label}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-800/40 border ${
+                cStatus === 'CRITICAL'
+                  ? 'border-red-500/30'
+                  : cStatus === 'WARNING'
+                  ? 'border-amber-500/30'
+                  : 'border-emerald-500/20'
+              }`}
+            >
+              <span className="text-base leading-none">{STATUS_ICON[cStatus]}</span>
+              <div>
+                <p className="text-xs font-medium text-gray-300">{label}</p>
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${STATUS_TEXT_COLOR[cStatus]}`}>
+                  {cStatus}
+                </p>
+              </div>
+              <span className="ml-auto text-sm">{icon}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

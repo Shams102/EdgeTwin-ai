@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-log.txt
+
+# Dataset (large file — keep locally, don't commit)
+# Remove this line if you want to commit the dataset
+# dataset/ai4i2020.csv
+
+# Model weights (large binary — regenerate with train_model.py)
+# model.pkl is needed for Docker build, so we DO commit it
+# Uncomment below to exclude it:
+# model.pkl
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

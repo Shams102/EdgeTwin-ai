@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getMachine, getPredictions, triggerPrediction } from '../api/client';
-import { getAlertsByMachine } from '../api/client';
+import { getMachine, getPredictions, triggerPrediction, getAlertsByMachine } from '../api/client';
+
+const POLL_INTERVAL_MS = 3000;
 
 export default function useMachine(machineId) {
   const [machine, setMachine] = useState(null);
@@ -10,9 +11,9 @@ export default function useMachine(machineId) {
   const [error, setError] = useState(null);
   const [predicting, setPredicting] = useState(false);
 
-  const fetchMachineData = useCallback(async () => {
+  const fetchMachineData = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
       const [machineRes, predRes, alertRes] = await Promise.all([
         getMachine(machineId),
@@ -25,7 +26,7 @@ export default function useMachine(machineId) {
     } catch (err) {
       setError(err.message || 'Failed to load machine data');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [machineId]);
 
@@ -33,8 +34,7 @@ export default function useMachine(machineId) {
     try {
       setPredicting(true);
       const response = await triggerPrediction(machineId, sensorData);
-      // Refresh all data after prediction
-      await fetchMachineData();
+      await fetchMachineData(false);
       return response.data;
     } catch (err) {
       setError(err.message || 'Prediction failed');
@@ -45,8 +45,15 @@ export default function useMachine(machineId) {
   }, [machineId, fetchMachineData]);
 
   useEffect(() => {
-    if (machineId) fetchMachineData();
+    if (!machineId) return;
+    // Initial load with spinner
+    fetchMachineData(true);
+    // Silent background poll every 3s
+    const id = setInterval(() => fetchMachineData(false), POLL_INTERVAL_MS);
+    return () => clearInterval(id);
   }, [machineId, fetchMachineData]);
+
+  const refetch = () => fetchMachineData(true);
 
   return {
     machine,
@@ -56,6 +63,6 @@ export default function useMachine(machineId) {
     error,
     predicting,
     runPrediction,
-    refetch: fetchMachineData,
+    refetch,
   };
 }
